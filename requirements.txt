@@ -1,0 +1,19 @@
+certifi==2021.5.30
+cycler @ file:///home/conda/feedstock_root/build_artifacts/cycler_1635519461629/work
+dlib @ file:///D:/bld/dlib_1617441818780/work
+kiwisolver @ file:///D:/bld/kiwisolver_1610099971815/work
+matplotlib @ file:///D:/bld/matplotlib-suite_1611858808344/work
+ninja==1.11.1
+numpy @ file:///D:/bld/numpy_1626682185159/work
+olefile @ file:///home/conda/feedstock_root/build_artifacts/olefile_1602866521163/work
+Pillow @ file:///D:/bld/pillow_1630696770108/work
+pyparsing @ file:///home/conda/feedstock_root/build_artifacts/pyparsing_1652235407899/work
+PyQt5==5.12.3
+PyQt5_sip==4.19.18
+PyQtChart==5.12
+PyQtWebEngine==5.12.1
+python-dateutil @ file:///home/conda/feedstock_root/build_artifacts/python-dateutil_1626286286081/work
+scipy @ file:///C:/bld/scipy_1629411592125/work
+six @ file:///home/conda/feedstock_root/build_artifacts/six_1620240208055/work
+tornado @ file:///D:/bld/tornado_1610094881553/work
+wincertstore==0.2
