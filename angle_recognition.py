@@ -7,6 +7,14 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 import pickle
 model = pickle.load(open('model.pkl', 'rb'))
+import time
+
+from sheets import write_columns_names, export_pandas_df_to_sheets, write_columns
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+file_path = "data.csv"
 
 # Inicializar o detector de faces
 detector = dlib.get_frontal_face_detector()
@@ -14,8 +22,14 @@ detector = dlib.get_frontal_face_detector()
 # Carregar o detector de pontos faciais (shape predictor)
 predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
 
-# Inicializar a captura de vídeo
-cap = cv2.VideoCapture(0)
+# Inicializar a captura de vídeo na maior resolução possível
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+
+# printar a definicao da camera
+print("Definicao da camera: ", cap.get(cv2.CAP_PROP_FRAME_WIDTH), "x", cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 # Imagem de teste para calibrar a distância focal
 img_teste = cap.read()[1]
@@ -94,6 +108,8 @@ while True:
     # Detectar as faces no frame
     faces = detector(gray)
 
+    atencao_por_id = [] 
+
     for face in faces:
         # Detectar os pontos faciais (landmarks) na face
         shape = predictor(gray, face)
@@ -121,23 +137,31 @@ while True:
         columns = ['x', 'y', 'z']
         x, y, z = rotation_vector[0][0], rotation_vector[1][0], rotation_vector[2][0]
         df = pd.DataFrame([[x, y, z]], columns=columns)
-        atencao = model.predict(df)
-        
-        # se esta olhando para a camera, fazer retangulo verde ao redor da face
-        if atencao == 1:
-            cv2.rectangle(frame, (face.left(), face.top()), (face.right(), face.bottom()), (0, 255, 0), 2)
-        else:
-            cv2.rectangle(frame, (face.left(), face.top()), (face.right(), face.bottom()), (0, 0, 255), 2)
+        atencao = model.predict_proba(df)[0][1]
 
+        atencao_por_id.append(atencao)
+        
+        # printar a porcentagem de atencao em cima da cabeca
+        cv2.putText(frame, str(round(atencao*100, 2))+"%", (int(image_points[0][0]), int(image_points[0][1])), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2)
 
         for p in image_points:
             cv2.circle(frame, (int(p[0]), int(p[1])), 3, (0,0,255), -1)
-
 
         p1 = ( int(image_points[0][0]), int(image_points[0][1]))
         p2 = ( int(nose_end_point2D[0][0][0]), int(nose_end_point2D[0][0][1]))
 
         cv2.line(frame, p1, p2, (255,0,0), 2)
+
+    # media_atencao = np.mean(atencao_por_id)
+
+    # # exportar atencao por id como csv de uma linha
+    # media_atencao = 0
+    # data = [0]
+    # data.insert(0, media_atencao)
+
+    # columns = [f"id{i}" for i in range(len(data) - 1)]
+    # columns.insert(0, "media")
+    # pd.DataFrame([data], columns=columns).to_csv("data.csv", index=False)
 
     # Mostrar o frame resultante invertida horizontalmente
     cv2.imshow('Pontos Faciais', cv2.flip(frame, 1))
@@ -152,17 +176,28 @@ while True:
         out_of_atention.append(rotation_vector)
         print("out of atention")
 
-# # salvar em um txt os dados de in_atention e out_of_atention juntos em um mesmo arquivo com a diferenciaçao de 0 e 1
-# colums = ['x', 'y', 'z', 'atencao']
-# df = pd.DataFrame(columns=colums)
+    # if os.getenv("ID") is None:
+    #     spreadsheet_id = write_columns_names(file_path)
+    #     with open(".env", "a") as file:
+    #         file.write(f"ID={spreadsheet_id}")
 
-# for i in range(len(in_atention)):
-#     df = df.append({'x': in_atention[i][0], 'y': in_atention[i][1], 'z': in_atention[i][2], 'atencao': 1}, ignore_index=True)
+    #     export_pandas_df_to_sheets(spreadsheet_id, file_path)
+    # else:
+    #     spreadsheet_id = os.getenv("ID")
+    #     write_columns(file_path, spreadsheet_id)
+    #     export_pandas_df_to_sheets(spreadsheet_id, file_path)
 
-# for i in range(len(out_of_atention)):
-#     df = df.append({'x': out_of_atention[i][0], 'y': out_of_atention[i][1], 'z': out_of_atention[i][2], 'atencao': 0}, ignore_index=True)
+# salvar em um txt os dados de in_atention e out_of_atention juntos em um mesmo arquivo com a diferenciaçao de 0 e 1
+colums = ['x', 'y', 'z', 'atencao']
+df = pd.DataFrame(columns=colums)
 
-# df.to_csv('dados_rotacao.csv', index=False)
+for i in range(len(in_atention)):
+    df = df.append({'x': in_atention[i][0], 'y': in_atention[i][1], 'z': in_atention[i][2], 'atencao': 1}, ignore_index=True)
+
+for i in range(len(out_of_atention)):
+    df = df.append({'x': out_of_atention[i][0], 'y': out_of_atention[i][1], 'z': out_of_atention[i][2], 'atencao': 0}, ignore_index=True)
+
+df.to_csv('dados_rotacao.csv', index=False)
 
 
 # Liberar os recursos
