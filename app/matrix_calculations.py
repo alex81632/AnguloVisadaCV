@@ -6,6 +6,8 @@ import pandas as pd
 import pickle
 import pygame as pg
 model = pickle.load(open('model.pkl', 'rb'))
+import time
+import matplotlib.pyplot as plt
 
 class AttentioRecognition:
     def __init__(self):
@@ -13,8 +15,18 @@ class AttentioRecognition:
         # printar a media de atencao na tela
         pg.font.init()
         self.font = pg.font.SysFont('Comic Sans MS', 30)
+        self.font_aviso = pg.font.SysFont('Comic Sans MS', 60)
         # Inicializar o detector de faces
         self.detector = dlib.get_frontal_face_detector()
+
+        self.media_por_momento = []
+        self.media_por_momento5 = []
+
+        self.graph = pg.image.load("grafico.png")
+
+        self.update_graf()
+
+        self.max_alunos = 1
 
         self.shape = None
         self.atencao_por_id = [] 
@@ -98,7 +110,9 @@ class AttentioRecognition:
         # Detectar as faces no frame
         faces = self.detector(gray)
 
-        self.atencao_por_id = [] 
+        self.atencao_por_id = []
+
+        self.max_alunos = max(self.max_alunos, len(faces))
 
         for face in faces:
             # Detectar os pontos faciais (landmarks) na face
@@ -130,10 +144,12 @@ class AttentioRecognition:
                 cv2.rectangle(frame, (face.left(), face.top()), (face.right(), face.bottom()), (0, 0, 255), 2)
 
 
-        self.media_atencao = np.mean(self.atencao_por_id)
+        self.media_atencao = np.sum(self.atencao_por_id)/self.max_alunos
         # se for nan, colocar 0
         if np.isnan(self.media_atencao):
             self.media_atencao = 0
+        
+        self.media_por_momento.append((time.time(), self.media_atencao))
         
         self.data_atencao.append(self.media_atencao)
 
@@ -141,19 +157,47 @@ class AttentioRecognition:
             self.data_atencao.pop(0)
         
         self.media_5min = np.mean(self.data_atencao)
+        self.media_por_momento5.append((time.time(), self.media_5min))
         # se for nan, colocar 0
         if np.isnan(self.media_5min):
             self.media_5min = 0
 
+        # fazer o grafico das duas atencoes em funcao do tempo
+        figure = plt.figure(figsize=(16, 9))
+        plt.plot([i[0] for i in self.media_por_momento], [i[1] for i in self.media_por_momento], label="Media de atencao")
+        plt.plot([i[0] for i in self.media_por_momento5], [i[1] for i in self.media_por_momento5], label="Media de atencao nos ultimos 5 minutos")
+        plt.legend()
+        plt.xlabel("Tempo (s)")
+        plt.ylabel("Media de atencao")
+        plt.savefig("grafico.png")
+        
         return frame
     
     def print_medias(self, screen):
-        text = self.font.render(f"Media de atencao: {round(self.media_atencao*100, 2)}%", False, (0, 0, 0))
-        screen.blit(text, (0, 0))
+        text = self.font.render(f"Atual: {round(self.media_atencao*100, 2)}%", False, (0, 0, 0))
+        screen.blit(text, (20, 20))
 
         # printar a media de atencao na tela
-        text = self.font.render(f"Media de atencao nos ultimos 5 minutos: {round(self.media_5min*100, 2)}%", False, (0, 0, 0))
-        screen.blit(text, (0, 30))
+        text = self.font.render(f"Media: {round(self.media_5min*100, 2)}%", False, (0, 0, 0))
+        screen.blit(text, (20, 60))
 
     def retornar_media(self):
-        return self.media_atencao, self.media_5min, self.atencao_por_id
+        return self.media_atencao, self.media_5min, self.atencao_por_id, self.max_alunos
+    
+    def aviso_baixa_atencao(self, screen):
+        if self.media_5min < 0.3:
+            text = self.font_aviso.render(f"Baixa atencao", False, (255, 0, 0))
+            # aviso no centro da tela
+            screen.blit(text, (screen.get_width()//2 - text.get_width()//2, screen.get_height()//2 - text.get_height()//2))
+
+    def print_graf(self, screen, scale):
+        if scale:
+            self.graph = pg.transform.scale(self.graph, (screen.get_width(), screen.get_height()))
+            screen.blit(self.graph, (0, 0))
+        else:
+            self.graph = pg.transform.scale(self.graph, (320, 180))
+            # grafico no topo direito
+            screen.blit(self.graph, (screen.get_width() - self.graph.get_width()-20, 20))
+
+    def update_graf(self):
+        self.graph = pg.image.load("grafico.png")
